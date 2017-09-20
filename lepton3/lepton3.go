@@ -15,16 +15,16 @@ import (
 	"periph.io/x/periph/conn/spi/spireg"
 )
 
-// XXX rename file
 // XXX use fixed errors where possible
 // XXX deal with printfs (enable a debug mode or something?)
 // XXX document copy minimisation
 // XXX document public interface
 // XXX allow speed to be selected
 // XXX profiling
+// XXX vendoring
 
 const (
-	vospiHeaderSize = 4 // 2 byte header, 2 byte CRC
+	vospiHeaderSize = 4 // 2 byte ID, 2 byte CRC
 	vospiDataSize   = 160
 	vospiPacketSize = vospiHeaderSize + vospiDataSize
 
@@ -45,11 +45,13 @@ const (
 
 var frameBounds = image.Rect(0, 0, colsPerFrame, rowsPerFrame)
 
-func New() *Dev {
-	return new(Dev)
+// New returns a new Lepton3 instance.
+func New() *Lepton3 {
+	return new(Lepton3)
 }
 
-type Dev struct {
+// Lepton3 manages a connection to an FLIR Lepton 3 camera.
+type Lepton3 struct {
 	spiPort  spi.PortCloser
 	spiConn  spi.Conn
 	packetCh chan []byte
@@ -59,7 +61,7 @@ type Dev struct {
 
 // Open initialises the SPI connection and starts streaming packets
 // from the camera.
-func (d *Dev) Open() error {
+func (d *Lepton3) Open() error {
 	spiPort, err := spireg.Open("")
 	if err != nil {
 		return err
@@ -80,7 +82,7 @@ func (d *Dev) Open() error {
 // Close stops streaming of packets from the camera and closes the SPI
 // device connection. It must only be called if streaming was started
 // with Open().
-func (d *Dev) Close() {
+func (d *Lepton3) Close() {
 	d.stopStream()
 
 	if d.spiPort != nil {
@@ -93,7 +95,7 @@ func (d *Dev) Close() {
 // called after a successful call to Open(). Although there is some
 // internal buffering of camera packets, it must be called frequently
 // enough to ensure frames are not lost.
-func (d *Dev) NextFrame() (*image.Gray16, error) {
+func (d *Lepton3) NextFrame() (*image.Gray16, error) {
 	// XXX this should take an image to write into instead of creating a new one
 	// XXX timeout when nothing valid for some time
 
@@ -113,7 +115,7 @@ func (d *Dev) NextFrame() (*image.Gray16, error) {
 			continue
 		}
 
-		im, err := f.addPacket(packetNum, packet)
+		im, err := f.nextPacket(packetNum, packet)
 		if err != nil {
 			fmt.Printf("addPacket: %v\n", err)
 			if err := d.reset(); err != nil {
@@ -129,7 +131,7 @@ func (d *Dev) NextFrame() (*image.Gray16, error) {
 // Snapshot is convenience method for capturing a single frame. It
 // should not be called if streaming is already active (i.e. Open has
 // been called and Close has not been called yet).
-func (d *Dev) Snapshot() (*image.Gray16, error) {
+func (d *Lepton3) Snapshot() (*image.Gray16, error) {
 	if err := d.Open(); err != nil {
 		return nil, err
 	}
@@ -137,14 +139,14 @@ func (d *Dev) Snapshot() (*image.Gray16, error) {
 	return d.NextFrame()
 }
 
-func (d *Dev) reset() error {
+func (d *Lepton3) reset() error {
 	fmt.Println("RESET")
 	d.Close()
 	time.Sleep(200 * time.Millisecond)
 	return d.Open()
 }
 
-func (d *Dev) startStream() {
+func (d *Lepton3) startStream() {
 	// XXX check how long the channel ends up getting under normal use
 	d.packetCh = make(chan []byte, packetBufferSize)
 	d.done = make(chan struct{})
@@ -172,7 +174,7 @@ func (d *Dev) startStream() {
 	}()
 }
 
-func (d *Dev) stopStream() {
+func (d *Lepton3) stopStream() {
 	// XXX don't call this if the stream goroutine isn't running
 	close(d.done)
 	d.wg.Wait()
@@ -219,7 +221,7 @@ type frame struct {
 	framePackets   [][]byte
 }
 
-func (f *frame) addPacket(packetNum int, packet []byte) (*image.Gray16, error) {
+func (f *frame) nextPacket(packetNum int, packet []byte) (*image.Gray16, error) {
 	if !f.sequential(packetNum) {
 		return nil, fmt.Errorf("out of order packet: %d -> %d", f.packetNum, packetNum)
 	}

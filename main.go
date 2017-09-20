@@ -15,19 +15,21 @@ func checkErr(label string, err error) {
 	}
 }
 
+// XXX implement snapshot and streaming options
+
 func main() {
 	_, err := host.Init()
 	checkErr("host init", err)
 
-	dev := lepton3.New()
-	err = dev.Open()
+	camera := lepton3.New()
+	err = camera.Open()
 	checkErr("Open", err)
-	defer dev.Close()
+	defer camera.Close()
 
 	t := time.Now()
 	for i := 0; i < 90; i++ {
 		fmt.Println(i)
-		_, err := dev.NextFrame()
+		_, err := camera.NextFrame()
 		checkErr("NextFrame", err)
 	}
 	fmt.Println(time.Since(t))
