@@ -19,6 +19,9 @@ import (
 // XXX allow speed to be selected
 // XXX profiling
 // XXX vendoring
+// XXX measure error rate over time
+
+// XXX investigate better/faster resync strategies
 
 const (
 	// Video Over SPI packets
@@ -42,12 +45,12 @@ const (
 	packetBufferSize = 1024
 
 	// Packet bitmasks
-	packetHeaderDiscard = 0x0F00
+	packetHeaderDiscard = 0x0F
 	packetNumMask       = 0x0FFF
 
 	// The maximum time a single frame read is allowed to take
 	// (including resync attempts)
-	frameTimeout = 5 * time.Second
+	frameTimeout = 10 * time.Second
 )
 
 // New returns a new Lepton3 instance.
@@ -162,10 +165,10 @@ func (d *Lepton3) Snapshot() (*image.Gray16, error) {
 }
 
 func (d *Lepton3) resync() error {
-	fmt.Println("RESET")
+	fmt.Println("resync!")
 	d.Close()
 	d.frame.reset()
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(300 * time.Millisecond)
 	return d.Open()
 }
 
@@ -185,7 +188,11 @@ func (d *Lepton3) startStream() {
 				return
 			}
 			for i := 0; i < len(rx); i += vospiPacketSize {
-				// XXX skip invalid packets here?
+				if rx[i]&packetHeaderDiscard == packetHeaderDiscard {
+					// No point sending discard packets onwards.
+					// This makes a big difference to CPU utilisation.
+					continue
+				}
 				select {
 				case <-d.done:
 					return
@@ -205,9 +212,6 @@ func validatePacket(packet []byte) (int, error) {
 	header := binary.BigEndian.Uint16(packet)
 	if header&0x8000 == 0x8000 {
 		return -1, errors.New("first bit set on header")
-	}
-	if header&packetHeaderDiscard == packetHeaderDiscard {
-		return -1, nil
 	}
 
 	packetNum := int(header & packetNumMask)
@@ -261,6 +265,7 @@ func (f *frame) nextPacket(packetNum int, packet []byte) (bool, error) {
 			return false, fmt.Errorf("invalid segment number: %d", segmentNum)
 		}
 		if segmentNum > 0 && segmentNum != f.segmentNum+1 {
+			// XXX this might not warrant a resync but certainly ignoring of the segment
 			return false, fmt.Errorf("out of order segment")
 		}
 		f.segmentNum = segmentNum
