@@ -13,7 +13,6 @@ import (
 	"periph.io/x/periph/conn/spi/spireg"
 )
 
-// XXX put code in the right place
 // XXX use fixed errors where possible
 // XXX deal with printfs (enable a debug mode or something?)
 // XXX document copy minimisation
@@ -47,7 +46,9 @@ const (
 
 // New returns a new Lepton3 instance.
 func New() *Lepton3 {
-	return new(Lepton3)
+	return &Lepton3{
+		frame: newFrame(),
+	}
 }
 
 // Lepton3 manages a connection to an FLIR Lepton 3 camera. It is not
@@ -58,6 +59,7 @@ type Lepton3 struct {
 	packetCh chan []byte
 	done     chan struct{}
 	wg       sync.WaitGroup
+	frame    *frame
 }
 
 // Open initialises the SPI connection and starts streaming packets
@@ -106,7 +108,7 @@ func (d *Lepton3) Close() {
 func (d *Lepton3) NextFrame(im *image.Gray16) error {
 	// XXX timeout when nothing valid for some time
 
-	f := newFrame()
+	d.frame.reset()
 	for {
 		packet := <-d.packetCh
 
@@ -116,21 +118,19 @@ func (d *Lepton3) NextFrame(im *image.Gray16) error {
 			if err := d.reset(); err != nil {
 				return err
 			}
-			f = newFrame()
 			continue
 		} else if packetNum < 0 {
 			continue
 		}
 
-		complete, err := f.nextPacket(packetNum, packet)
+		complete, err := d.frame.nextPacket(packetNum, packet)
 		if err != nil {
 			fmt.Printf("addPacket: %v\n", err)
 			if err := d.reset(); err != nil {
 				return err
 			}
-			f = newFrame()
 		} else if complete {
-			f.writeImage(im)
+			d.frame.writeImage(im)
 			return nil
 		}
 	}
@@ -153,6 +153,7 @@ func (d *Lepton3) Snapshot() (*image.Gray16, error) {
 func (d *Lepton3) reset() error {
 	fmt.Println("RESET")
 	d.Close()
+	d.frame.reset()
 	time.Sleep(200 * time.Millisecond)
 	return d.Open()
 }
@@ -214,14 +215,13 @@ func validatePacket(packet []byte) (int, error) {
 	return packetNum, nil
 }
 
-// XXX reuse a singe frame instead of recreating?
 func newFrame() *frame {
-	return &frame{
-		packetNum:      -1,
-		segmentNum:     0,
+	f := &frame{
 		segmentPackets: make([][]byte, packetsPerSegment),
 		framePackets:   make([][]byte, packetsPerFrame),
 	}
+	f.reset()
+	return f
 }
 
 type frame struct {
@@ -229,6 +229,11 @@ type frame struct {
 	segmentNum     int
 	segmentPackets [][]byte
 	framePackets   [][]byte
+}
+
+func (f *frame) reset() {
+	f.packetNum = -1
+	f.segmentNum = 0
 }
 
 func (f *frame) nextPacket(packetNum int, packet []byte) (bool, error) {
