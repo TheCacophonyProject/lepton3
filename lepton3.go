@@ -33,6 +33,8 @@ const (
 	segmentsPerFrame  = 4
 	packetsPerFrame   = segmentsPerFrame * packetsPerSegment
 	colsPerPacket     = colsPerFrame / 2
+	segmentPacketNum  = 20
+	maxPacketNum      = 59
 
 	// SPI transfer
 	packetsPerRead   = 200 // XXX play around with this to check effect on CPU load and reliability
@@ -42,6 +44,10 @@ const (
 	// Packet bitmasks
 	packetHeaderDiscard = 0x0F00
 	packetNumMask       = 0x0FFF
+
+	// The maximum time a single frame read is allowed to take
+	// (including resync attempts)
+	frameTimeout = 5 * time.Second
 )
 
 // New returns a new Lepton3 instance.
@@ -106,16 +112,21 @@ func (d *Lepton3) Close() {
 // packets, NextFrame must be called frequently enough to ensure
 // frames are not lost.
 func (d *Lepton3) NextFrame(im *image.Gray16) error {
-	// XXX timeout when nothing valid for some time
-
+	timeout := time.After(frameTimeout)
 	d.frame.reset()
+
+	var packet []byte
 	for {
-		packet := <-d.packetCh
+		select {
+		case packet = <-d.packetCh:
+		case <-timeout:
+			return errors.New("frame timeout")
+		}
 
 		packetNum, err := validatePacket(packet)
 		if err != nil {
 			fmt.Println(err)
-			if err := d.reset(); err != nil {
+			if err := d.resync(); err != nil {
 				return err
 			}
 			continue
@@ -126,7 +137,7 @@ func (d *Lepton3) NextFrame(im *image.Gray16) error {
 		complete, err := d.frame.nextPacket(packetNum, packet)
 		if err != nil {
 			fmt.Printf("addPacket: %v\n", err)
-			if err := d.reset(); err != nil {
+			if err := d.resync(); err != nil {
 				return err
 			}
 		} else if complete {
@@ -137,7 +148,7 @@ func (d *Lepton3) NextFrame(im *image.Gray16) error {
 }
 
 // Snapshot is convenience method for capturing a single frame. It
-// should not be called if streaming is already active.
+// should *not* be called if streaming is already active.
 func (d *Lepton3) Snapshot() (*image.Gray16, error) {
 	if err := d.Open(); err != nil {
 		return nil, err
@@ -150,7 +161,7 @@ func (d *Lepton3) Snapshot() (*image.Gray16, error) {
 	return im, nil
 }
 
-func (d *Lepton3) reset() error {
+func (d *Lepton3) resync() error {
 	fmt.Println("RESET")
 	d.Close()
 	d.frame.reset()
@@ -159,7 +170,6 @@ func (d *Lepton3) reset() error {
 }
 
 func (d *Lepton3) startStream() {
-	// XXX check how long the channel ends up getting under normal use
 	d.packetCh = make(chan []byte, packetBufferSize)
 	d.done = make(chan struct{})
 	d.wg.Add(1)
@@ -245,7 +255,7 @@ func (f *frame) nextPacket(packetNum int, packet []byte) (bool, error) {
 	f.segmentPackets[packetNum] = packet[vospiHeaderSize:]
 
 	switch packetNum {
-	case 20:
+	case segmentPacketNum:
 		segmentNum := int(packet[0] >> 4)
 		if segmentNum > 4 {
 			return false, fmt.Errorf("invalid segment number: %d", segmentNum)
@@ -254,7 +264,7 @@ func (f *frame) nextPacket(packetNum int, packet []byte) (bool, error) {
 			return false, fmt.Errorf("out of order segment")
 		}
 		f.segmentNum = segmentNum
-	case 59:
+	case maxPacketNum:
 		if f.segmentNum > 0 {
 			// This should be fast as only slice headers for the
 			// segment are being copied, not the packet data itself.
@@ -270,7 +280,7 @@ func (f *frame) nextPacket(packetNum int, packet []byte) (bool, error) {
 }
 
 func (f *frame) sequential(packetNum int) bool {
-	if packetNum == 0 && f.packetNum == 59 {
+	if packetNum == 0 && f.packetNum == maxPacketNum {
 		return true
 	}
 	return packetNum == f.packetNum+1
@@ -280,6 +290,7 @@ func (f *frame) writeImage(im *image.Gray16) {
 	// XXX is there a faster way of doing this rather writing one
 	// pixel at a time? Can we blat out a packet row at a time?
 	// (remember endian-ness)
+	// Maybe don't use an image at all?
 	for packetNum, packet := range f.framePackets {
 		for i := 0; i < vospiDataSize; i += 2 {
 			x := i >> 1 // divide 2
