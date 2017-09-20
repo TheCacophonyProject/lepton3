@@ -18,13 +18,13 @@ import (
 // XXX use fixed errors where possible
 // XXX deal with printfs (enable a debug mode or something?)
 // XXX document copy minimisation
+// XXX document public interface
 
 const (
 	vospiHeaderSize = 4 // 2 byte header, 2 byte CRC
 	vospiDataSize   = 160
 	vospiPacketSize = vospiHeaderSize + vospiDataSize
 
-	// XXX check if any of these aren't used
 	colsPerFrame      = 160
 	rowsPerFrame      = 120
 	packetsPerSegment = 60
@@ -35,6 +35,7 @@ const (
 	packetsPerRead   = 200 // XXX play around with this to check effect on CPU load and reliability
 	transferSize     = vospiPacketSize * packetsPerRead
 	packetBufferSize = 1024
+	imageBufferSize  = 64
 
 	packetHeaderDiscard = 0x0F00
 	packetNumMask       = 0x0FFF
@@ -55,9 +56,43 @@ type Dev struct {
 }
 
 func (d *Dev) ReadFrame() (*image.Gray16, error) {
-	d.open()
+	if err := d.open(); err != nil {
+		return nil, err
+	}
 	defer d.close()
 	return d.readFrame()
+}
+
+// XXX not convinced about this interface
+// might be better to make open, close, and readFrame public and adding some checks around their usage
+func (d *Dev) StreamFrames() (chan *image.Gray16, chan struct{}, error) {
+	if err := d.open(); err != nil {
+		return nil, nil, err
+	}
+
+	imCh := make(chan *image.Gray16, imageBufferSize)
+	stopCh := make(chan struct{})
+
+	go func() {
+		defer d.close()
+
+		for {
+			// XXX proper handling of the error
+			im, err := d.readFrame()
+			if err != nil {
+				fmt.Printf("readFrame: %v\n", err)
+				return
+			}
+
+			select {
+			case <-stopCh:
+				return
+			case imCh <- im:
+			}
+		}
+	}()
+
+	return imCh, stopCh, nil
 }
 
 func (d *Dev) open() error {
@@ -96,6 +131,7 @@ func (d *Dev) reset() error {
 }
 
 func (d *Dev) startStream() {
+	// XXX check how long the channel ends up getting under normal use
 	d.packetCh = make(chan []byte, packetBufferSize)
 	d.done = make(chan struct{})
 	d.wg.Add(1)
@@ -111,6 +147,7 @@ func (d *Dev) startStream() {
 				return
 			}
 			for i := 0; i < len(rx); i += vospiPacketSize {
+				// XXX skip invalid packets here?
 				select {
 				case <-d.done:
 					return
@@ -188,6 +225,7 @@ func validatePacket(packet []byte) (int, error) {
 func newFrame() *frame {
 	return &frame{
 		packetNum:      -1,
+		segmentNum:     0,
 		segmentPackets: make([][]byte, packetsPerSegment),
 		framePackets:   make([][]byte, packetsPerFrame),
 	}
@@ -230,11 +268,11 @@ func (f *frame) addPacket(packetNum int, packet []byte) (*image.Gray16, error) {
 			im := image.NewGray16(frameBounds)
 			for packetNum, packet := range f.framePackets {
 				for i := 0; i < vospiDataSize; i += 2 {
-					x := i >> 1
+					x := i >> 1 // divide 2
 					if packetNum%2 == 1 {
 						x += colsPerPacket
 					}
-					y := packetNum >> 1
+					y := packetNum >> 1 // divide 2
 					c := binary.BigEndian.Uint16(packet[i : i+2])
 					im.SetGray16(x, y, color.Gray16{c})
 				}
