@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	"periph.io/x/periph/host"
 
@@ -19,21 +20,17 @@ func main() {
 	checkErr("host init", err)
 
 	dev := lepton3.New()
-	// im, err := dev.ReadFrame()
-	// checkErr("ReadFrame", err)
+	err = dev.Open()
+	checkErr("Open", err)
+	defer dev.Close()
 
-	i := 0
-	imCh, _, err := dev.StreamFrames()
-	checkErr("StreamFrames", err)
-	for {
-		select {
-		case im := <-imCh:
-			var _ = im
-			// dumpHumanImage(fmt.Sprintf("%04d.png", i), im)
-			// checkErr("dumpHumanImage", err)
-			i++
-		}
+	t := time.Now()
+	for i := 0; i < 90; i++ {
+		fmt.Println(i)
+		_, err := dev.NextFrame()
+		checkErr("NextFrame", err)
 	}
+	fmt.Println(time.Since(t))
 
 	// err = dumpHumanImage("lepton.png", im)
 	// checkErr("dumpHumanImage", err)

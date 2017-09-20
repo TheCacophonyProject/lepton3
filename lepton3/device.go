@@ -15,10 +15,13 @@ import (
 	"periph.io/x/periph/conn/spi/spireg"
 )
 
+// XXX rename file
 // XXX use fixed errors where possible
 // XXX deal with printfs (enable a debug mode or something?)
 // XXX document copy minimisation
 // XXX document public interface
+// XXX allow speed to be selected
+// XXX profiling
 
 const (
 	vospiHeaderSize = 4 // 2 byte header, 2 byte CRC
@@ -35,7 +38,6 @@ const (
 	packetsPerRead   = 200 // XXX play around with this to check effect on CPU load and reliability
 	transferSize     = vospiPacketSize * packetsPerRead
 	packetBufferSize = 1024
-	imageBufferSize  = 64
 
 	packetHeaderDiscard = 0x0F00
 	packetNumMask       = 0x0FFF
@@ -55,47 +57,9 @@ type Dev struct {
 	wg       sync.WaitGroup
 }
 
-func (d *Dev) ReadFrame() (*image.Gray16, error) {
-	if err := d.open(); err != nil {
-		return nil, err
-	}
-	defer d.close()
-	return d.readFrame()
-}
-
-// XXX not convinced about this interface
-// might be better to make open, close, and readFrame public and adding some checks around their usage
-func (d *Dev) StreamFrames() (chan *image.Gray16, chan struct{}, error) {
-	if err := d.open(); err != nil {
-		return nil, nil, err
-	}
-
-	imCh := make(chan *image.Gray16, imageBufferSize)
-	stopCh := make(chan struct{})
-
-	go func() {
-		defer d.close()
-
-		for {
-			// XXX proper handling of the error
-			im, err := d.readFrame()
-			if err != nil {
-				fmt.Printf("readFrame: %v\n", err)
-				return
-			}
-
-			select {
-			case <-stopCh:
-				return
-			case imCh <- im:
-			}
-		}
-	}()
-
-	return imCh, stopCh, nil
-}
-
-func (d *Dev) open() error {
+// Open initialises the SPI connection and starts streaming packets
+// from the camera.
+func (d *Dev) Open() error {
 	spiPort, err := spireg.Open("")
 	if err != nil {
 		return err
@@ -110,11 +74,13 @@ func (d *Dev) open() error {
 	d.spiConn = spiConn
 
 	d.startStream()
-
 	return nil
 }
 
-func (d *Dev) close() {
+// Close stops streaming of packets from the camera and closes the SPI
+// device connection. It must only be called if streaming was started
+// with Open().
+func (d *Dev) Close() {
 	d.stopStream()
 
 	if d.spiPort != nil {
@@ -123,11 +89,59 @@ func (d *Dev) close() {
 	d.spiConn = nil
 }
 
+// NextFrame returns the next frame from the camera. It should only be
+// called after a successful call to Open(). Although there is some
+// internal buffering of camera packets, it must be called frequently
+// enough to ensure frames are not lost.
+func (d *Dev) NextFrame() (*image.Gray16, error) {
+	// XXX this should take an image to write into instead of creating a new one
+	// XXX timeout when nothing valid for some time
+
+	f := newFrame()
+	for {
+		packet := <-d.packetCh
+
+		packetNum, err := validatePacket(packet)
+		if err != nil {
+			fmt.Println(err)
+			if err := d.reset(); err != nil {
+				return nil, err
+			}
+			f = newFrame()
+			continue
+		} else if packetNum < 0 {
+			continue
+		}
+
+		im, err := f.addPacket(packetNum, packet)
+		if err != nil {
+			fmt.Printf("addPacket: %v\n", err)
+			if err := d.reset(); err != nil {
+				return nil, err
+			}
+			f = newFrame()
+		} else if im != nil {
+			return im, nil
+		}
+	}
+}
+
+// Snapshot is convenience method for capturing a single frame. It
+// should not be called if streaming is already active (i.e. Open has
+// been called and Close has not been called yet).
+func (d *Dev) Snapshot() (*image.Gray16, error) {
+	if err := d.Open(); err != nil {
+		return nil, err
+	}
+	defer d.Close()
+	return d.NextFrame()
+}
+
 func (d *Dev) reset() error {
 	fmt.Println("RESET")
-	d.close()
+	d.Close()
 	time.Sleep(200 * time.Millisecond)
-	return d.open()
+	return d.Open()
 }
 
 func (d *Dev) startStream() {
@@ -162,39 +176,6 @@ func (d *Dev) stopStream() {
 	// XXX don't call this if the stream goroutine isn't running
 	close(d.done)
 	d.wg.Wait()
-}
-
-func (d *Dev) readFrame() (*image.Gray16, error) {
-	// XXX open must have been called first
-	// XXX timeout when nothing valid for some time
-
-	f := newFrame()
-	for {
-		packet := <-d.packetCh
-
-		packetNum, err := validatePacket(packet)
-		if err != nil {
-			fmt.Println(err)
-			if err := d.reset(); err != nil {
-				return nil, err
-			}
-			f = newFrame()
-			continue
-		} else if packetNum < 0 {
-			continue
-		}
-
-		im, err := f.addPacket(packetNum, packet)
-		if err != nil {
-			fmt.Printf("addPacket: %v\n", err)
-			if err := d.reset(); err != nil {
-				return nil, err
-			}
-			f = newFrame()
-		} else if im != nil {
-			return im, nil
-		}
-	}
 }
 
 func validatePacket(packet []byte) (int, error) {
