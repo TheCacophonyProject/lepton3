@@ -3,9 +3,9 @@ package main
 import (
 	"fmt"
 
-	"golepton/lepton3"
-
 	"periph.io/x/periph/host"
+
+	"golepton/lepton3"
 )
 
 func checkErr(label string, err error) {
@@ -19,5 +19,9 @@ func main() {
 	checkErr("host init", err)
 
 	dev := lepton3.New()
-	dev.ReadFrame()
+	im, err := dev.ReadFrame()
+	checkErr("ReadFrame", err)
+
+	err = dumpHumanImage("lepton.png", im)
+	checkErr("dumpHumanImage", err)
 }
