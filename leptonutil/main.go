@@ -6,7 +6,7 @@ import (
 
 	"periph.io/x/periph/host"
 
-	"golepton/lepton3"
+	"github.com/TheCacophonyProject/lepton3"
 )
 
 func checkErr(label string, err error) {
@@ -27,7 +27,6 @@ func main() {
 	defer camera.Close()
 
 	im := lepton3.NewFrameImage()
-
 	t := time.Now()
 	for i := 0; i < 90; i++ {
 		fmt.Println(i)

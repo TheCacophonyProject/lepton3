@@ -13,6 +13,7 @@ import (
 	"periph.io/x/periph/conn/spi/spireg"
 )
 
+// XXX put code in the right place
 // XXX use fixed errors where possible
 // XXX deal with printfs (enable a debug mode or something?)
 // XXX document copy minimisation
@@ -272,8 +273,8 @@ func (f *frame) sequential(packetNum int) bool {
 
 func (f *frame) writeImage(im *image.Gray16) {
 	// XXX is there a faster way of doing this rather writing one
-	// pixel at a time? Can we blat out a packet at a time? (remember
-	// endian-ness)
+	// pixel at a time? Can we blat out a packet row at a time?
+	// (remember endian-ness)
 	for packetNum, packet := range f.framePackets {
 		for i := 0; i < vospiDataSize; i += 2 {
 			x := i >> 1 // divide 2
