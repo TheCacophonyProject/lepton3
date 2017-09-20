@@ -1,7 +1,5 @@
 package lepton3
 
-// XXX rename?
-
 import (
 	"encoding/binary"
 	"errors"
@@ -18,16 +16,17 @@ import (
 // XXX use fixed errors where possible
 // XXX deal with printfs (enable a debug mode or something?)
 // XXX document copy minimisation
-// XXX document public interface
 // XXX allow speed to be selected
 // XXX profiling
 // XXX vendoring
 
 const (
+	// Video Over SPI packets
 	vospiHeaderSize = 4 // 2 byte ID, 2 byte CRC
 	vospiDataSize   = 160
 	vospiPacketSize = vospiHeaderSize + vospiDataSize
 
+	// Packets, segments and frames
 	colsPerFrame      = 160
 	rowsPerFrame      = 120
 	packetsPerSegment = 60
@@ -35,22 +34,23 @@ const (
 	packetsPerFrame   = segmentsPerFrame * packetsPerSegment
 	colsPerPacket     = colsPerFrame / 2
 
+	// SPI transfer
 	packetsPerRead   = 200 // XXX play around with this to check effect on CPU load and reliability
 	transferSize     = vospiPacketSize * packetsPerRead
 	packetBufferSize = 1024
 
+	// Packet bitmasks
 	packetHeaderDiscard = 0x0F00
 	packetNumMask       = 0x0FFF
 )
-
-var frameBounds = image.Rect(0, 0, colsPerFrame, rowsPerFrame)
 
 // New returns a new Lepton3 instance.
 func New() *Lepton3 {
 	return new(Lepton3)
 }
 
-// Lepton3 manages a connection to an FLIR Lepton 3 camera.
+// Lepton3 manages a connection to an FLIR Lepton 3 camera. It is not
+// goroutine safe.
 type Lepton3 struct {
 	spiPort  spi.PortCloser
 	spiConn  spi.Conn
@@ -91,12 +91,18 @@ func (d *Lepton3) Close() {
 	d.spiConn = nil
 }
 
-// NextFrame returns the next frame from the camera. It should only be
-// called after a successful call to Open(). Although there is some
-// internal buffering of camera packets, it must be called frequently
-// enough to ensure frames are not lost.
-func (d *Lepton3) NextFrame() (*image.Gray16, error) {
-	// XXX this should take an image to write into instead of creating a new one
+// NextFrame returns the next frame from the camera into the image
+// provided.
+//
+// The output image is provided (rather than being created by
+// NextFrame) to minimise memory allocations. Use NewFrameImage() to
+// create an image suitable for use with NextFrame().
+//
+// NextFrame should only be called after a successful call to
+// Open(). Although there is some internal buffering of camera
+// packets, NextFrame must be called frequently enough to ensure
+// frames are not lost.
+func (d *Lepton3) NextFrame(im *image.Gray16) error {
 	// XXX timeout when nothing valid for some time
 
 	f := newFrame()
@@ -107,7 +113,7 @@ func (d *Lepton3) NextFrame() (*image.Gray16, error) {
 		if err != nil {
 			fmt.Println(err)
 			if err := d.reset(); err != nil {
-				return nil, err
+				return err
 			}
 			f = newFrame()
 			continue
@@ -115,28 +121,32 @@ func (d *Lepton3) NextFrame() (*image.Gray16, error) {
 			continue
 		}
 
-		im, err := f.nextPacket(packetNum, packet)
+		complete, err := f.nextPacket(packetNum, packet)
 		if err != nil {
 			fmt.Printf("addPacket: %v\n", err)
 			if err := d.reset(); err != nil {
-				return nil, err
+				return err
 			}
 			f = newFrame()
-		} else if im != nil {
-			return im, nil
+		} else if complete {
+			f.writeImage(im)
+			return nil
 		}
 	}
 }
 
 // Snapshot is convenience method for capturing a single frame. It
-// should not be called if streaming is already active (i.e. Open has
-// been called and Close has not been called yet).
+// should not be called if streaming is already active.
 func (d *Lepton3) Snapshot() (*image.Gray16, error) {
 	if err := d.Open(); err != nil {
 		return nil, err
 	}
 	defer d.Close()
-	return d.NextFrame()
+	im := NewFrameImage()
+	if err := d.NextFrame(im); err != nil {
+		return nil, err
+	}
+	return im, nil
 }
 
 func (d *Lepton3) reset() error {
@@ -175,7 +185,6 @@ func (d *Lepton3) startStream() {
 }
 
 func (d *Lepton3) stopStream() {
-	// XXX don't call this if the stream goroutine isn't running
 	close(d.done)
 	d.wg.Wait()
 }
@@ -221,9 +230,9 @@ type frame struct {
 	framePackets   [][]byte
 }
 
-func (f *frame) nextPacket(packetNum int, packet []byte) (*image.Gray16, error) {
+func (f *frame) nextPacket(packetNum int, packet []byte) (bool, error) {
 	if !f.sequential(packetNum) {
-		return nil, fmt.Errorf("out of order packet: %d -> %d", f.packetNum, packetNum)
+		return false, fmt.Errorf("out of order packet: %d -> %d", f.packetNum, packetNum)
 	}
 
 	// Store the packet data in current segment
@@ -233,10 +242,10 @@ func (f *frame) nextPacket(packetNum int, packet []byte) (*image.Gray16, error) 
 	case 20:
 		segmentNum := int(packet[0] >> 4)
 		if segmentNum > 4 {
-			return nil, fmt.Errorf("invalid segment number: %d", segmentNum)
+			return false, fmt.Errorf("invalid segment number: %d", segmentNum)
 		}
 		if segmentNum > 0 && segmentNum != f.segmentNum+1 {
-			return nil, fmt.Errorf("out of order segment")
+			return false, fmt.Errorf("out of order segment")
 		}
 		f.segmentNum = segmentNum
 	case 59:
@@ -247,24 +256,11 @@ func (f *frame) nextPacket(packetNum int, packet []byte) (*image.Gray16, error) 
 		}
 		if f.segmentNum == 4 {
 			// Complete frame!
-			// XXX extract
-			im := image.NewGray16(frameBounds)
-			for packetNum, packet := range f.framePackets {
-				for i := 0; i < vospiDataSize; i += 2 {
-					x := i >> 1 // divide 2
-					if packetNum%2 == 1 {
-						x += colsPerPacket
-					}
-					y := packetNum >> 1 // divide 2
-					c := binary.BigEndian.Uint16(packet[i : i+2])
-					im.SetGray16(x, y, color.Gray16{c})
-				}
-			}
-			return im, nil
+			return true, nil
 		}
 	}
 	f.packetNum = packetNum
-	return nil, nil
+	return false, nil
 }
 
 func (f *frame) sequential(packetNum int) bool {
@@ -272,4 +268,21 @@ func (f *frame) sequential(packetNum int) bool {
 		return true
 	}
 	return packetNum == f.packetNum+1
+}
+
+func (f *frame) writeImage(im *image.Gray16) {
+	// XXX is there a faster way of doing this rather writing one
+	// pixel at a time? Can we blat out a packet at a time? (remember
+	// endian-ness)
+	for packetNum, packet := range f.framePackets {
+		for i := 0; i < vospiDataSize; i += 2 {
+			x := i >> 1 // divide 2
+			if packetNum%2 == 1 {
+				x += colsPerPacket
+			}
+			y := packetNum >> 1 // divide 2
+			c := binary.BigEndian.Uint16(packet[i : i+2])
+			im.SetGray16(x, y, color.Gray16{c})
+		}
+	}
 }
