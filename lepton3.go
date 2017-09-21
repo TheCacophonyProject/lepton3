@@ -13,7 +13,6 @@ import (
 	"periph.io/x/periph/conn/spi/spireg"
 )
 
-// XXX deal with printfs (enable a debug mode or something?)
 // XXX document copy minimisation
 // XXX measure error rate over time
 
@@ -58,6 +57,7 @@ func New(spiSpeed int64) *Lepton3 {
 		spiSpeed: spiSpeed,
 		ring:     newRing(ringChunks, transferSize),
 		frame:    newFrame(),
+		log:      func(string) {},
 	}
 }
 
@@ -71,6 +71,11 @@ type Lepton3 struct {
 	tomb     *tomb.Tomb
 	ring     *ring
 	frame    *frame
+	log      func(string)
+}
+
+func (d *Lepton3) SetLogFunc(log func(string)) {
+	d.log = log
 }
 
 // Open initialises the SPI connection and starts streaming packets
@@ -133,7 +138,7 @@ func (d *Lepton3) NextFrame(im *image.Gray16) error {
 
 		packetNum, err := validatePacket(packet)
 		if err != nil {
-			fmt.Println(err)
+			d.log(err.Error())
 			if err := d.resync(); err != nil {
 				return err
 			}
@@ -144,7 +149,7 @@ func (d *Lepton3) NextFrame(im *image.Gray16) error {
 
 		complete, err := d.frame.nextPacket(packetNum, packet)
 		if err != nil {
-			fmt.Printf("addPacket: %v\n", err)
+			d.log(err.Error())
 			if err := d.resync(); err != nil {
 				return err
 			}
@@ -170,7 +175,7 @@ func (d *Lepton3) Snapshot() (*image.Gray16, error) {
 }
 
 func (d *Lepton3) resync() error {
-	fmt.Println("resync!")
+	d.log("resync!")
 	d.Close()
 	d.frame.reset()
 	time.Sleep(300 * time.Millisecond)

@@ -52,6 +52,10 @@ func runMain() error {
 	}
 	defer camera.Close()
 
+	camera.SetLogFunc(func(t string) {
+		log.Printf(t)
+	})
+
 	im := lepton3.NewFrameImage()
 	i := 0
 	for {
@@ -61,6 +65,7 @@ func runMain() error {
 		}
 		fmt.Printf(".")
 
+		// XXX reliability suffers when writing to disk - separate goroutine?
 		if opts.Output == "png" {
 			err := dumpToPNG(fmt.Sprintf("%05d.png", i), im)
 			if err != nil {
