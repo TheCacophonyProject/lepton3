@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"image"
 	"image/color"
+	"math"
 	"sync"
 	"time"
 
@@ -40,9 +41,10 @@ const (
 	maxPacketNum      = 59
 
 	// SPI transfer
-	packetsPerRead   = 200 // XXX play around with this to check effect on CPU load and reliability
-	transferSize     = vospiPacketSize * packetsPerRead
-	packetBufferSize = 1024
+	packetsPerRead     = 200 // XXX play around with this to check effect on CPU load and reliability
+	transferSize       = vospiPacketSize * packetsPerRead
+	packetBufferSize   = 1024
+	maxPacketsPerFrame = 1500 // including discards and then rounded up somewhat
 
 	// Packet bitmasks
 	packetHeaderDiscard = 0x0F
@@ -55,7 +57,11 @@ const (
 
 // New returns a new Lepton3 instance.
 func New() *Lepton3 {
+	// The ring buffer needs to be big enough to handle all the SPI
+	// transfers for a single frame.
+	ringChunks := int(math.Ceil(float64(maxPacketsPerFrame) / float64(packetsPerRead)))
 	return &Lepton3{
+		ring:  newRing(ringChunks, transferSize),
 		frame: newFrame(),
 	}
 }
@@ -68,6 +74,7 @@ type Lepton3 struct {
 	packetCh chan []byte
 	done     chan struct{}
 	wg       sync.WaitGroup
+	ring     *ring
 	frame    *frame
 }
 
@@ -179,9 +186,9 @@ func (d *Lepton3) startStream() {
 
 	go func() {
 		defer d.wg.Done()
+
 		for {
-			// XXX don't allocate each time - ring buffer
-			rx := make([]byte, transferSize)
+			rx := d.ring.next()
 			if err := d.spiConn.Tx(nil, rx); err != nil {
 				// XXX report back errors
 				fmt.Printf("Tx failed: %v\n", err)
@@ -307,4 +314,34 @@ func (f *frame) writeImage(im *image.Gray16) {
 			im.SetGray16(x, y, color.Gray16{c})
 		}
 	}
+}
+
+// ring manages a large byte slice, returning equal sizes chunks of
+// it. It is used to avoid memory allocation and garbage collection in
+// frequently called code.
+type ring struct {
+	numChunks int
+	chunkSize int
+	ringSize  int
+	offset    int
+	buf       []byte
+}
+
+func newRing(numChunks, chunkSize int) *ring {
+	ringSize := numChunks * chunkSize
+	return &ring{
+		numChunks: numChunks,
+		chunkSize: chunkSize,
+		ringSize:  ringSize,
+		buf:       make([]byte, ringSize),
+	}
+}
+
+func (r *ring) next() []byte {
+	out := r.buf[r.offset : r.offset+r.chunkSize]
+	r.offset += r.chunkSize
+	if r.offset >= r.ringSize {
+		r.offset = 0
+	}
+	return out
 }
