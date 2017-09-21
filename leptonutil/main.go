@@ -2,39 +2,72 @@ package main
 
 import (
 	"fmt"
-	"time"
+	"log"
 
+	arg "github.com/alexflint/go-arg"
 	"periph.io/x/periph/host"
 
 	"github.com/TheCacophonyProject/lepton3"
 )
 
-func checkErr(label string, err error) {
+type Options struct {
+	Frames int    `arg:"-f,help:number of frames to collect (default=all)"`
+	Output string `arg:"positional,required,help:png or none"`
+}
+
+func procCommandLine() Options {
+	opts := Options{}
+	arg.MustParse(&opts)
+	if opts.Output != "png" && opts.Output != "none" {
+		log.Fatalf("invalid output type: %q", opts.Output)
+	}
+	return opts
+}
+
+func main() {
+	err := runMain()
 	if err != nil {
-		panic(fmt.Sprintf("%s: %v", label, err))
+		log.Fatal(err)
 	}
 }
 
-// XXX implement snapshot and streaming options
+func runMain() error {
+	opts := procCommandLine()
 
-func main() {
 	_, err := host.Init()
-	checkErr("host init", err)
+	if err != nil {
+		return err
+	}
 
 	camera := lepton3.New()
 	err = camera.Open()
-	checkErr("Open", err)
+	if err != nil {
+		return err
+	}
 	defer camera.Close()
 
 	im := lepton3.NewFrameImage()
-	t := time.Now()
-	for i := 0; i < 200; i++ {
-		fmt.Println(i)
+	i := 0
+	for {
 		err := camera.NextFrame(im)
-		checkErr("NextFrame", err)
-	}
-	fmt.Println(time.Since(t))
+		if err != nil {
+			return err
+		}
+		fmt.Printf(".")
 
-	// err = dumpHumanImage("lepton.png", im)
-	// checkErr("dumpHumanImage", err)
+		if opts.Output == "png" {
+			err := dumpToPNG(fmt.Sprintf("%05d.png", i), im)
+			if err != nil {
+				return nil
+			}
+		}
+
+		i++
+		if opts.Frames > 0 && i >= opts.Frames {
+			break
+		}
+	}
+	fmt.Println()
+
+	return nil
 }

@@ -7,7 +7,7 @@ import (
 	"os"
 )
 
-func dumpHumanImage(path string, im *image.Gray16) error {
+func dumpToPNG(path string, im *image.Gray16) error {
 	f, err := os.Create(path)
 	if err != nil {
 		return err
