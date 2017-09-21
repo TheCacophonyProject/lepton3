@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"image"
 	"image/color"
 	"image/png"
@@ -12,8 +13,12 @@ func dumpToPNG(path string, im *image.Gray16) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	return png.Encode(f, reduce(im))
+	w := bufio.NewWriter(f)
+	defer func() {
+		w.Flush()
+		f.Close()
+	}()
+	return png.Encode(w, reduce(im))
 }
 
 // reduce the intensity of a 14 bits images into 8 bits centered at midpoint.
