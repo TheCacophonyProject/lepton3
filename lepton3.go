@@ -15,7 +15,6 @@ import (
 
 // XXX deal with printfs (enable a debug mode or something?)
 // XXX document copy minimisation
-// XXX allow speed to be selected
 // XXX measure error rate over time
 
 const (
@@ -50,20 +49,22 @@ const (
 )
 
 // New returns a new Lepton3 instance.
-func New() *Lepton3 {
+func New(spiSpeed int64) *Lepton3 {
 	// The ring buffer is used to avoid memory allocations for SPI
 	// transfers. It needs to be big enough to handle all the SPI
 	// transfers for at least a single frame.
 	ringChunks := int(math.Ceil(float64(maxPacketsPerFrame) / float64(packetsPerRead)))
 	return &Lepton3{
-		ring:  newRing(ringChunks, transferSize),
-		frame: newFrame(),
+		spiSpeed: spiSpeed,
+		ring:     newRing(ringChunks, transferSize),
+		frame:    newFrame(),
 	}
 }
 
 // Lepton3 manages a connection to an FLIR Lepton 3 camera. It is not
 // goroutine safe.
 type Lepton3 struct {
+	spiSpeed int64
 	spiPort  spi.PortCloser
 	spiConn  spi.Conn
 	packetCh chan []byte
@@ -79,7 +80,7 @@ func (d *Lepton3) Open() error {
 	if err != nil {
 		return err
 	}
-	spiConn, err := spiPort.Connect(30000000, spi.Mode3, 8)
+	spiConn, err := spiPort.Connect(d.spiSpeed, spi.Mode3, 8)
 	if err != nil {
 		spiPort.Close()
 		return err
@@ -123,7 +124,7 @@ func (d *Lepton3) NextFrame(im *image.Gray16) error {
 		case packet = <-d.packetCh:
 		case <-d.tomb.Dying():
 			if err := d.tomb.Err(); err != nil {
-				return fmt.Errorf("streaming failed with: %v", err)
+				return fmt.Errorf("streaming failed: %v", err)
 			}
 			return nil
 		case <-timeout:

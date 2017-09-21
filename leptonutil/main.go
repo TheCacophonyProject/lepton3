@@ -1,3 +1,6 @@
+// This implements a simple utility for pulling frames off the Lepton
+// 3 thermal camera.
+
 package main
 
 import (
@@ -13,14 +16,17 @@ import (
 type Options struct {
 	Frames int    `arg:"-f,help:number of frames to collect (default=all)"`
 	Output string `arg:"positional,required,help:png or none"`
+	Speed  int64  `arg:"-s,required,help:SPI speed in MHz (default=30MHz)"`
 }
 
 func procCommandLine() Options {
 	opts := Options{}
+	opts.Speed = 30
 	arg.MustParse(&opts)
 	if opts.Output != "png" && opts.Output != "none" {
 		log.Fatalf("invalid output type: %q", opts.Output)
 	}
+	opts.Speed *= 1000000 // convert to Hz
 	return opts
 }
 
@@ -39,7 +45,7 @@ func runMain() error {
 		return err
 	}
 
-	camera := lepton3.New()
+	camera := lepton3.New(opts.Speed)
 	err = camera.Open()
 	if err != nil {
 		return err
