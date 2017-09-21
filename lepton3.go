@@ -6,22 +6,17 @@ import (
 	"fmt"
 	"image"
 	"math"
-	"sync"
 	"time"
 
+	tomb "gopkg.in/tomb.v2"
 	"periph.io/x/periph/conn/spi"
 	"periph.io/x/periph/conn/spi/spireg"
 )
 
-// XXX use fixed errors where possible
 // XXX deal with printfs (enable a debug mode or something?)
 // XXX document copy minimisation
 // XXX allow speed to be selected
-// XXX profiling
-// XXX vendoring
 // XXX measure error rate over time
-
-// XXX investigate better/faster resync strategies
 
 const (
 	// Video Over SPI packets
@@ -56,8 +51,9 @@ const (
 
 // New returns a new Lepton3 instance.
 func New() *Lepton3 {
-	// The ring buffer needs to be big enough to handle all the SPI
-	// transfers for a single frame.
+	// The ring buffer is used to avoid memory allocations for SPI
+	// transfers. It needs to be big enough to handle all the SPI
+	// transfers for at least a single frame.
 	ringChunks := int(math.Ceil(float64(maxPacketsPerFrame) / float64(packetsPerRead)))
 	return &Lepton3{
 		ring:  newRing(ringChunks, transferSize),
@@ -71,8 +67,7 @@ type Lepton3 struct {
 	spiPort  spi.PortCloser
 	spiConn  spi.Conn
 	packetCh chan []byte
-	done     chan struct{}
-	wg       sync.WaitGroup
+	tomb     *tomb.Tomb
 	ring     *ring
 	frame    *frame
 }
@@ -93,8 +88,7 @@ func (d *Lepton3) Open() error {
 	d.spiPort = spiPort
 	d.spiConn = spiConn
 
-	d.startStream()
-	return nil
+	return d.startStream()
 }
 
 // Close stops streaming of packets from the camera and closes the SPI
@@ -102,7 +96,6 @@ func (d *Lepton3) Open() error {
 // with Open().
 func (d *Lepton3) Close() {
 	d.stopStream()
-
 	if d.spiPort != nil {
 		d.spiPort.Close()
 	}
@@ -128,6 +121,11 @@ func (d *Lepton3) NextFrame(im *image.Gray16) error {
 	for {
 		select {
 		case packet = <-d.packetCh:
+		case <-d.tomb.Dying():
+			if err := d.tomb.Err(); err != nil {
+				return fmt.Errorf("streaming failed with: %v", err)
+			}
+			return nil
 		case <-timeout:
 			return errors.New("frame timeout")
 		}
@@ -178,20 +176,17 @@ func (d *Lepton3) resync() error {
 	return d.Open()
 }
 
-func (d *Lepton3) startStream() {
+func (d *Lepton3) startStream() error {
+	if d.tomb != nil {
+		return errors.New("streaming already active")
+	}
+	d.tomb = new(tomb.Tomb)
 	d.packetCh = make(chan []byte, packetBufferSize)
-	d.done = make(chan struct{})
-	d.wg.Add(1)
-
-	go func() {
-		defer d.wg.Done()
-
+	d.tomb.Go(func() error {
 		for {
 			rx := d.ring.next()
 			if err := d.spiConn.Tx(nil, rx); err != nil {
-				// XXX report back errors
-				fmt.Printf("Tx failed: %v\n", err)
-				return
+				return err
 			}
 			for i := 0; i < len(rx); i += vospiPacketSize {
 				if rx[i]&packetHeaderDiscard == packetHeaderDiscard {
@@ -200,18 +195,20 @@ func (d *Lepton3) startStream() {
 					continue
 				}
 				select {
-				case <-d.done:
-					return
+				case <-d.tomb.Dying():
+					return tomb.ErrDying
 				case d.packetCh <- rx[i : i+vospiPacketSize]:
 				}
 			}
 		}
-	}()
+	})
+	return nil
 }
 
 func (d *Lepton3) stopStream() {
-	close(d.done)
-	d.wg.Wait()
+	d.tomb.Kill(nil)
+	d.tomb.Wait()
+	d.tomb = nil
 }
 
 func validatePacket(packet []byte) (int, error) {
