@@ -7,8 +7,6 @@ package lepton3
 import (
 	"encoding/binary"
 	"fmt"
-	"image"
-	"image/color"
 )
 
 func newFrame() *frame {
@@ -73,11 +71,7 @@ func (f *frame) sequential(packetNum int) bool {
 	return packetNum == f.packetNum+1
 }
 
-func (f *frame) writeImage(im *image.Gray16) {
-	// XXX is there a faster way of doing this rather writing one
-	// pixel at a time? Can we blat out a packet row at a time?
-	// (remember endian-ness)
-	// Maybe don't use an image at all?
+func (f *frame) output(outFrame *Frame) {
 	for packetNum, packet := range f.framePackets {
 		for i := 0; i < vospiDataSize; i += 2 {
 			x := i >> 1 // divide 2
@@ -85,8 +79,7 @@ func (f *frame) writeImage(im *image.Gray16) {
 				x += colsPerPacket
 			}
 			y := packetNum >> 1 // divide 2
-			c := binary.BigEndian.Uint16(packet[i : i+2])
-			im.SetGray16(x, y, color.Gray16{c})
+			outFrame[y][x] = binary.BigEndian.Uint16(packet[i : i+2])
 		}
 	}
 }

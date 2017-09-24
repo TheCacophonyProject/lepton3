@@ -10,9 +10,11 @@ import (
 	"image/color"
 	"image/png"
 	"os"
+
+	"github.com/TheCacophonyProject/lepton3"
 )
 
-func dumpToPNG(path string, im *image.Gray16) error {
+func dumpToPNG(path string, frame *lepton3.Frame) error {
 	f, err := os.Create(path)
 	if err != nil {
 		return err
@@ -22,21 +24,21 @@ func dumpToPNG(path string, im *image.Gray16) error {
 		w.Flush()
 		f.Close()
 	}()
-	return png.Encode(w, reduce(im))
+	return png.Encode(w, reduce(frame))
 }
+
+var dst = image.NewNRGBA(image.Rect(0, 0, lepton3.FrameCols, lepton3.FrameRows))
 
 // reduce the intensity of a 14 bits images into 8 bits centered at midpoint.
 //
 // No AGC is done.
-func reduce(src *image.Gray16) *image.NRGBA {
+func reduce(src *lepton3.Frame) *image.NRGBA {
 	midPoint := uint16(8192)
 	base := midPoint - uint16(len(palette)/2)
 	max := base + uint16(len(palette)) - 1
-	b := src.Bounds()
-	dst := image.NewNRGBA(b)
-	for y := b.Min.Y; y < b.Max.Y; y++ {
-		for x := b.Min.X; x < b.Max.X; x++ {
-			i := src.Gray16At(x, y).Y
+	for y := 0; y < lepton3.FrameRows; y++ {
+		for x := 0; x < lepton3.FrameCols; x++ {
+			i := src[y][x]
 			if i < base {
 				i = base
 			} else if i > max {

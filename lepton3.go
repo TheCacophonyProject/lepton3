@@ -8,7 +8,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"image"
 	"math"
 	"time"
 
@@ -27,12 +26,12 @@ const (
 	vospiPacketSize = vospiHeaderSize + vospiDataSize
 
 	// Packets, segments and frames
-	colsPerFrame      = 160
-	rowsPerFrame      = 120
+	FrameCols         = 160
+	FrameRows         = 120
 	packetsPerSegment = 60
 	segmentsPerFrame  = 4
 	packetsPerFrame   = segmentsPerFrame * packetsPerSegment
-	colsPerPacket     = colsPerFrame / 2
+	colsPerPacket     = FrameCols / 2
 	segmentPacketNum  = 20
 	maxPacketNum      = 59
 
@@ -50,6 +49,9 @@ const (
 	// (including resync attempts)
 	frameTimeout = 10 * time.Second
 )
+
+// Frame represents the thermal readings for a single frame.
+type Frame [FrameRows][FrameCols]uint16
 
 // New returns a new Lepton3 instance.
 func New(spiSpeed int64) *Lepton3 {
@@ -112,18 +114,17 @@ func (d *Lepton3) Close() {
 	d.spiConn = nil
 }
 
-// NextFrame returns the next frame from the camera into the image
+// NextFrame returns the next frame from the camera into the Frame
 // provided.
 //
-// The output image is provided (rather than being created by
-// NextFrame) to minimise memory allocations. Use NewFrameImage() to
-// create an image suitable for use with NextFrame().
+// The output Frame is provided (rather than being created by
+// NextFrame) to minimise memory allocations.
 //
 // NextFrame should only be called after a successful call to
 // Open(). Although there is some internal buffering of camera
 // packets, NextFrame must be called frequently enough to ensure
 // frames are not lost.
-func (d *Lepton3) NextFrame(im *image.Gray16) error {
+func (d *Lepton3) NextFrame(outFrame *Frame) error {
 	timeout := time.After(frameTimeout)
 	d.frame.reset()
 
@@ -158,7 +159,7 @@ func (d *Lepton3) NextFrame(im *image.Gray16) error {
 				return err
 			}
 		} else if complete {
-			d.frame.writeImage(im)
+			d.frame.output(outFrame)
 			return nil
 		}
 	}
@@ -166,16 +167,16 @@ func (d *Lepton3) NextFrame(im *image.Gray16) error {
 
 // Snapshot is convenience method for capturing a single frame. It
 // should *not* be called if streaming is already active.
-func (d *Lepton3) Snapshot() (*image.Gray16, error) {
+func (d *Lepton3) Snapshot() (*Frame, error) {
 	if err := d.Open(); err != nil {
 		return nil, err
 	}
 	defer d.Close()
-	im := NewFrameImage()
-	if err := d.NextFrame(im); err != nil {
+	frame := new(Frame)
+	if err := d.NextFrame(frame); err != nil {
 		return nil, err
 	}
-	return im, nil
+	return frame, nil
 }
 
 func (d *Lepton3) resync() error {

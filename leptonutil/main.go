@@ -77,10 +77,10 @@ func runMain() error {
 		log.Printf(t)
 	})
 
-	im := lepton3.NewFrameImage()
+	frame := new(lepton3.Frame)
 	i := 0
 	for {
-		err := camera.NextFrame(im)
+		err := camera.NextFrame(frame)
 		if err != nil {
 			return err
 		}
@@ -88,7 +88,7 @@ func runMain() error {
 
 		if opts.Output == "png" {
 			filename := filepath.Join(opts.Directory, fmt.Sprintf("%05d.png", i))
-			err := dumpToPNG(filename, im)
+			err := dumpToPNG(filename, frame)
 			if err != nil {
 				return err
 			}
