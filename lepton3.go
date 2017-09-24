@@ -13,7 +13,7 @@ import (
 	"periph.io/x/periph/conn/spi/spireg"
 )
 
-// XXX document copy minimisation
+// XXX cpu utilisations seems to have gone up from 33% to 60% when writing PNGs. Recent change?
 // XXX measure error rate over time
 
 const (

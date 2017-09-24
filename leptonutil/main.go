@@ -4,24 +4,31 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
+	"path/filepath"
 
 	arg "github.com/alexflint/go-arg"
+	"periph.io/x/periph/conn/gpio"
+	"periph.io/x/periph/conn/gpio/gpioreg"
 	"periph.io/x/periph/host"
 
 	"github.com/TheCacophonyProject/lepton3"
 )
 
 type Options struct {
-	Frames int    `arg:"-f,help:number of frames to collect (default=all)"`
-	Output string `arg:"positional,required,help:png or none"`
-	Speed  int64  `arg:"-s,required,help:SPI speed in MHz (default=30MHz)"`
+	Frames    int    `arg:"-f,help:number of frames to collect (default=all)"`
+	Speed     int64  `arg:"-s,help:SPI speed in MHz"`
+	Directory string `arg:"-d,help:Directory to write output files"`
+	PowerPin  string `arg:"-p,help:Optional pin to set to power on camera"`
+	Output    string `arg:"positional,required,help:png or none"`
 }
 
 func procCommandLine() Options {
 	opts := Options{}
 	opts.Speed = 30
+	opts.Directory = "."
 	arg.MustParse(&opts)
 	if opts.Output != "png" && opts.Output != "none" {
 		log.Fatalf("invalid output type: %q", opts.Output)
@@ -45,6 +52,16 @@ func runMain() error {
 		return err
 	}
 
+	if opts.PowerPin != "" {
+		powerPin := gpioreg.ByName(opts.PowerPin)
+		if powerPin == nil {
+			return errors.New("unable to load power pin")
+		}
+		if err := powerPin.Out(gpio.High); err != nil {
+			return errors.New("failed to set camera power pin")
+		}
+	}
+
 	camera := lepton3.New(opts.Speed)
 	err = camera.Open()
 	if err != nil {
@@ -65,11 +82,11 @@ func runMain() error {
 		}
 		fmt.Printf(".")
 
-		// XXX reliability suffers when writing to disk - separate goroutine?
 		if opts.Output == "png" {
-			err := dumpToPNG(fmt.Sprintf("%05d.png", i), im)
+			filename := filepath.Join(opts.Directory, fmt.Sprintf("%05d.png", i))
+			err := dumpToPNG(filename, im)
 			if err != nil {
-				return nil
+				return err
 			}
 		}
 
