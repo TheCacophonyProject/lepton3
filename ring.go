@@ -1,3 +1,7 @@
+// Copyright 2017 The Cacophony Project. All rights reserved.
+// Use of this source code is governed by the Apache License Version 2.0;
+// see the LICENSE file for further details.
+
 package lepton3
 
 // ring manages a fixed byte slice, returning equal sized chunks of it
