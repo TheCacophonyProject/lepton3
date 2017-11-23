@@ -84,20 +84,25 @@ func (d *Lepton3) SetLogFunc(log func(string)) {
 }
 
 func (d *Lepton3) SetRadiometry(enable bool) error {
+	d.log("opening I2C bus")
 	i2cBus, err := i2creg.Open("")
 	if err != nil {
 		return err
 	}
 	defer i2cBus.Close()
 
+	d.log("opening CCI")
 	cciDev, err := cci.New(i2cBus)
 	if err != nil {
 		return fmt.Errorf("cci.New: %v", err)
 	}
+
+	d.log(fmt.Sprintf("setting radiometry to %v", enable))
 	if err := cciDev.SetRadiometry(enable); err != nil {
 		return fmt.Errorf("SetRadiometry: %v", err)
 	}
 
+	d.log("checking radiometry setting is correct")
 	value, err := cciDev.GetRadiometry()
 	if err != nil {
 		return fmt.Errorf("GetRadiometry: %v", err)
