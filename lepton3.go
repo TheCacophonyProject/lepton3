@@ -172,8 +172,7 @@ func (d *Lepton3) NextFrame(outFrame *Frame) error {
 
 		packetNum, err := validatePacket(packet)
 		if err != nil {
-			d.log(err.Error())
-			if err := d.resync(); err != nil {
+			if err := d.resync(err); err != nil {
 				return err
 			}
 			continue
@@ -183,8 +182,7 @@ func (d *Lepton3) NextFrame(outFrame *Frame) error {
 
 		complete, err := d.frame.nextPacket(packetNum, packet)
 		if err != nil {
-			d.log(err.Error())
-			if err := d.resync(); err != nil {
+			if err := d.resync(err); err != nil {
 				return err
 			}
 		} else if complete {
@@ -208,8 +206,8 @@ func (d *Lepton3) Snapshot() (*Frame, error) {
 	return frame, nil
 }
 
-func (d *Lepton3) resync() error {
-	d.log("resync!")
+func (d *Lepton3) resync(reason error) error {
+	d.log(fmt.Sprintf("resync! %v", reason))
 	d.Close()
 	d.frame.reset()
 	time.Sleep(300 * time.Millisecond)
