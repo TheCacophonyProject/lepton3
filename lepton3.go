@@ -44,7 +44,7 @@ const (
 	// SPI transfer
 	packetsPerRead     = 128
 	transferSize       = vospiPacketSize * packetsPerRead
-	packetBufferSize   = 1024
+	packetChSize       = 512
 	maxPacketsPerFrame = 1500 // including discards and then rounded up somewhat
 
 	// Packet bitmasks
@@ -223,7 +223,7 @@ func (d *Lepton3) startStream() error {
 		return errors.New("streaming already active")
 	}
 	d.tomb = new(tomb.Tomb)
-	d.packetCh = make(chan []byte, packetBufferSize)
+	d.packetCh = make(chan []byte, packetChSize)
 	d.tomb.Go(func() error {
 		for {
 			rx := d.ring.next()
