@@ -59,9 +59,9 @@ const (
 // New returns a new Lepton3 instance.
 func New(spiSpeed int64) *Lepton3 {
 	// The ring buffer is used to avoid memory allocations for SPI
-	// transfers. It needs to be big enough to handle all the SPI
-	// transfers for at least a single frame.
-	ringChunks := int(math.Ceil(float64(maxPacketsPerFrame) / float64(packetsPerRead)))
+	// transfers. We aim to have it big enough to handle all the SPI
+	// transfers for at least a 3 frames.
+	ringChunks := 3 * int(math.Ceil(float64(maxPacketsPerFrame)/float64(packetsPerRead)))
 	return &Lepton3{
 		spiSpeed:     spiSpeed,
 		ring:         newRing(ringChunks, transferSize),
