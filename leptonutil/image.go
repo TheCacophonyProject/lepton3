@@ -35,7 +35,7 @@ func reduce(src *lepton3.Frame) *image.Gray16 {
 	maxVal := uint16(0)
 	for y := 0; y < lepton3.FrameRows; y++ {
 		for x := 0; x < lepton3.FrameCols; x++ {
-			i := src[y][x]
+			i := src.Pix[y][x]
 			if i > maxVal {
 				maxVal = i
 			}
@@ -46,7 +46,7 @@ func reduce(src *lepton3.Frame) *image.Gray16 {
 	}
 
 	var norm = math.MaxUint16 / (maxVal - minVal)
-	for y, row := range src {
+	for y, row := range src.Pix {
 		for x, val := range row {
 			dst.SetGray16(x, y, color.Gray16{Y: (val - minVal) * norm})
 		}

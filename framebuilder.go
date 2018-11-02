@@ -1,4 +1,4 @@
-// Copyright 2017 The Cacophony Project. All rights reserved.
+// Copyright 2018 The Cacophony Project. All rights reserved.
 // Use of this source code is governed by the Apache License Version 2.0;
 // see the LICENSE file for further details.
 
@@ -71,5 +71,5 @@ func (f *frameBuilder) sequential(packetNum int) bool {
 }
 
 func (f *frameBuilder) output(outFrame *RawFrame) {
-	copy(outFrame[:], f.frameBuf[telemetryPacketCount*vospiDataSize:])
+	copy(outFrame[:], f.frameBuf)
 }
