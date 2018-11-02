@@ -35,12 +35,13 @@ const (
 	// FrameRows is the Y resolution of the Lepton 3 camera.
 	FrameRows = 120
 
-	packetsPerSegment = 60
-	segmentsPerFrame  = 4
-	packetsPerFrame   = segmentsPerFrame * packetsPerSegment
-	colsPerPacket     = FrameCols / 2
-	segmentPacketNum  = 20
-	maxPacketNum      = 59
+	packetsPerSegment    = 61
+	maxPacketNum         = packetsPerSegment - 1
+	segmentsPerFrame     = 4
+	packetsPerFrame      = segmentsPerFrame * packetsPerSegment
+	colsPerPacket        = FrameCols / 2
+	segmentPacketNum     = 20
+	telemetryPacketCount = 4
 
 	// SPI transfer
 	packetsPerRead     = 128
@@ -61,6 +62,12 @@ const (
 func New(spiSpeed int64) (*Lepton3, error) {
 	cciDev, err := openCCI()
 	if err != nil {
+		return nil, err
+	}
+
+	// // Enable telemetry (as the header)
+	if err := cciDev.Init(); err != nil {
+		cciDev.Close()
 		return nil, err
 	}
 
