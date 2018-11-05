@@ -35,12 +35,13 @@ const (
 	// FrameRows is the Y resolution of the Lepton 3 camera.
 	FrameRows = 120
 
-	packetsPerSegment = 60
-	segmentsPerFrame  = 4
-	packetsPerFrame   = segmentsPerFrame * packetsPerSegment
-	colsPerPacket     = FrameCols / 2
-	segmentPacketNum  = 20
-	maxPacketNum      = 59
+	packetsPerSegment    = 61
+	maxPacketNum         = packetsPerSegment - 1
+	segmentsPerFrame     = 4
+	packetsPerFrame      = segmentsPerFrame * packetsPerSegment
+	colsPerPacket        = FrameCols / 2
+	segmentPacketNum     = 20
+	telemetryPacketCount = 4
 
 	// SPI transfer
 	packetsPerRead     = 128
@@ -58,22 +59,35 @@ const (
 )
 
 // New returns a new Lepton3 instance.
-func New(spiSpeed int64) *Lepton3 {
+func New(spiSpeed int64) (*Lepton3, error) {
+	cciDev, err := openCCI()
+	if err != nil {
+		return nil, err
+	}
+
+	// // Enable telemetry (as the header)
+	if err := cciDev.Init(); err != nil {
+		cciDev.Close()
+		return nil, err
+	}
+
 	// The ring buffer is used to avoid memory allocations for SPI
 	// transfers. We aim to have it big enough to handle all the SPI
 	// transfers for at least a 3 frames.
 	ringChunks := 3 * int(math.Ceil(float64(maxPacketsPerFrame)/float64(packetsPerRead)))
 	return &Lepton3{
+		cciDev:       cciDev,
 		spiSpeed:     spiSpeed,
 		ring:         newRing(ringChunks, transferSize),
 		frameBuilder: newFrameBuilder(),
 		log:          func(string) {},
-	}
+	}, nil
 }
 
 // Lepton3 manages a connection to an FLIR Lepton 3 camera. It is not
 // goroutine safe.
 type Lepton3 struct {
+	cciDev       *closingCCIDev
 	spiSpeed     int64
 	spiPort      spi.PortCloser
 	spiConn      spi.Conn
@@ -92,13 +106,7 @@ func (d *Lepton3) SetLogFunc(log func(string)) {
 // camera will attempt to automatically compensate for ambient
 // temperature changes.
 func (d *Lepton3) SetRadiometry(enable bool) error {
-	cciDev, err := openCCI()
-	if err != nil {
-		return err
-	}
-	defer cciDev.Close()
-
-	if err := cciDev.SetRadiometry(enable); err != nil {
+	if err := d.cciDev.SetRadiometry(enable); err != nil {
 		return fmt.Errorf("SetRadiometry: %v", err)
 	}
 	return nil
@@ -107,12 +115,7 @@ func (d *Lepton3) SetRadiometry(enable bool) error {
 // RunFFC forces the camera to run a Flat Field Correction
 // recalibration.
 func (d *Lepton3) RunFFC() error {
-	cciDev, err := openCCI()
-	if err != nil {
-		return err
-	}
-	defer cciDev.Close()
-	return cciDev.RunFFC()
+	return d.cciDev.RunFFC()
 }
 
 // Open initialises the SPI connection and starts streaming packets
@@ -139,10 +142,16 @@ func (d *Lepton3) Open() error {
 // with Open().
 func (d *Lepton3) Close() {
 	d.stopStream()
+
 	if d.spiPort != nil {
 		d.spiPort.Close()
 	}
 	d.spiConn = nil
+
+	if d.cciDev != nil {
+		d.cciDev.Close()
+	}
+	d.cciDev = nil
 }
 
 // NextFrame returns the next frame from the camera into the RawFrame
