@@ -15,12 +15,24 @@ type RawFrame [packetsPerFrame * vospiDataSize]byte
 
 // Frame represents the thermal readings for a single frame.
 type Frame struct {
-	Pix    [FrameRows][FrameCols]uint16
+	Pix    [][]uint16
 	Status Telemetry
 }
 
-// FramesHz define the approximate number of frames per second emitted by the Lepton 3 camera.
-const FramesHz = 9
+type CameraResolution interface {
+	XRes() int
+	YRes() int
+	FPS() int
+}
+
+func NewFrame(c CameraResolution) *Frame {
+	frame := new(Frame)
+	frame.Pix = make([][]uint16, c.YRes())
+	for i := range frame.Pix {
+		frame.Pix[i] = make([]uint16, c.XRes())
+	}
+	return frame
+}
 
 // ToFrame converts a RawFrame to a Frame.
 func (rf *RawFrame) ToFrame(out *Frame) error {
@@ -30,19 +42,20 @@ func (rf *RawFrame) ToFrame(out *Frame) error {
 
 	rawPix := rf[telemetryPacketCount*vospiDataSize:]
 	i := 0
-	for y := 0; y < FrameRows; y++ {
-		for x := 0; x < FrameCols; x++ {
+	for y, row := range out.Pix {
+		for x, _ := range row {
 			out.Pix[y][x] = binary.BigEndian.Uint16(rawPix[i : i+2])
 			i += 2
 		}
 	}
+
 	return nil
 }
 
 // Copy sets current frame as other frame
 func (fr *Frame) Copy(orig *Frame) {
 	fr.Status = orig.Status
-	for y := 0; y < FrameRows; y++ {
-		copy(fr.Pix[y][:], orig.Pix[y][:])
+	for y, row := range orig.Pix {
+		copy(fr.Pix[y][:], row)
 	}
 }

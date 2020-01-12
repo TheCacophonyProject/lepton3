@@ -5,15 +5,16 @@
 package lepton3
 
 import (
+	"fmt"
+	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
-
-	"github.com/stretchr/testify/assert"
 )
 
 func TestFrameCopy(t *testing.T) {
-	frame := new(Frame)
+	camera, _ := New(21)
 
+	frame := NewFrame(camera)
 	// Pixel values.
 	frame.Pix[0][0] = 1
 	frame.Pix[9][7] = 2
@@ -25,7 +26,7 @@ func TestFrameCopy(t *testing.T) {
 	frame.Status.FrameCount = 123
 	frame.Status.TempC = 23.1
 
-	frame2 := new(Frame)
+	frame2 := NewFrame(camera)
 	frame2.Copy(frame)
 
 	assert.Equal(t, 1, int(frame2.Pix[0][0]))
