@@ -59,10 +59,10 @@ const (
 	frameTimeout = 10 * time.Second
 )
 
-func (l *Lepton3) XRes() int {
+func (l *Lepton3) ResX() int {
 	return FrameCols
 }
-func (l *Lepton3) YRes() int {
+func (l *Lepton3) ResY() int {
 	return FrameRows
 }
 
