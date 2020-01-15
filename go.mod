@@ -6,8 +6,6 @@ require (
 	github.com/TheCacophonyProject/go-cptv v0.0.0-20190829021603-992765fceb9b
 	github.com/alexflint/go-arg v0.0.0-20180516182405-f7c0423bd11e
 	github.com/alexflint/go-scalar v0.0.0-20170216020425-e80c3b7ed292 // indirect
-	github.com/gferraro/go-cptv v0.0.0-20190522012101-cfce3277dd0d // indirect
-	github.com/stretchr/testify v1.2.2
 	golang.org/x/net v0.0.0-20180811021610-c39426892332 // indirect
 	gopkg.in/tomb.v2 v2.0.0-20161208151619-d5d1b5820637
 	periph.io/x/periph v3.6.2+incompatible
