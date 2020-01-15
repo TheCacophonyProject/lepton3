@@ -87,7 +87,7 @@ func runMain() error {
 	})
 
 	rawFrame := new(lepton3.RawFrame)
-	frame := new(lepton3.Frame)
+	frame := new(cptvframe.Frame)
 	i := 0
 	for {
 		err := camera.NextFrame(rawFrame)
