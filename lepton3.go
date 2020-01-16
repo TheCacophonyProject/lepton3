@@ -34,6 +34,7 @@ const (
 
 	// FrameRows is the Y resolution of the Lepton 3 camera.
 	FrameRows = 120
+	FramesHz  = 9
 
 	packetsPerSegment    = 61
 	maxPacketNum         = packetsPerSegment - 1
@@ -57,6 +58,13 @@ const (
 	// (including resync attempts)
 	frameTimeout = 10 * time.Second
 )
+
+func (l *Lepton3) ResX() int {
+	return FrameCols
+}
+func (l *Lepton3) ResY() int {
+	return FrameRows
+}
 
 // New returns a new Lepton3 instance.
 func New(spiSpeed int64) (*Lepton3, error) {

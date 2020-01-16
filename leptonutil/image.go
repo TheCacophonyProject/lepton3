@@ -12,10 +12,11 @@ import (
 	"math"
 	"os"
 
+	"github.com/TheCacophonyProject/go-cptv/cptvframe"
 	"github.com/TheCacophonyProject/lepton3"
 )
 
-func dumpToPNG(path string, frame *lepton3.Frame) error {
+func dumpToPNG(path string, frame *cptvframe.Frame) error {
 	f, err := os.Create(path)
 	if err != nil {
 		return err
@@ -30,7 +31,7 @@ func dumpToPNG(path string, frame *lepton3.Frame) error {
 
 var dst = image.NewGray16(image.Rect(0, 0, lepton3.FrameCols, lepton3.FrameRows))
 
-func reduce(src *lepton3.Frame) *image.Gray16 {
+func reduce(src *cptvframe.Frame) *image.Gray16 {
 	minVal := uint16(math.MaxUint16)
 	maxVal := uint16(0)
 	for y := 0; y < lepton3.FrameRows; y++ {

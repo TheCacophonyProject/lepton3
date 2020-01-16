@@ -11,6 +11,8 @@ import (
 	"bytes"
 	"encoding/binary"
 	"time"
+
+	"github.com/TheCacophonyProject/go-cptv/cptvframe"
 )
 
 // These are the valid values for the Telemetry.FFCState field.
@@ -21,20 +23,9 @@ const (
 	FFCComplete = "complete"
 )
 
-// Telemetry holds the useful status fields returned by a Lepton 3 thermal camera.
-type Telemetry struct {
-	TimeOn       time.Duration
-	FFCState     string
-	FrameCount   int
-	FrameMean    uint16
-	TempC        float64
-	LastFFCTempC float64
-	LastFFCTime  time.Duration
-}
-
 // ParseTelemetry converts a slice containing raw Lepton 3 telemetry
 // data into a Telemetry struct.
-func ParseTelemetry(raw []byte, t *Telemetry) error {
+func ParseTelemetry(raw []byte, t *cptvframe.Telemetry) error {
 	var tw telemetryWords
 	if err := binary.Read(bytes.NewBuffer(raw), Big16, &tw); err != nil {
 		return err

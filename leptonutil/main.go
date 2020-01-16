@@ -18,6 +18,7 @@ import (
 	"periph.io/x/periph/conn/gpio/gpioreg"
 	"periph.io/x/periph/host"
 
+	"github.com/TheCacophonyProject/go-cptv/cptvframe"
 	"github.com/TheCacophonyProject/lepton3"
 )
 
@@ -87,7 +88,7 @@ func runMain() error {
 	})
 
 	rawFrame := new(lepton3.RawFrame)
-	frame := new(lepton3.Frame)
+	frame := cptvframe.NewFrame(camera)
 	i := 0
 	for {
 		err := camera.NextFrame(rawFrame)
