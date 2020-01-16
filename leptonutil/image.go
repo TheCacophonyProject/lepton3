@@ -12,7 +12,7 @@ import (
 	"math"
 	"os"
 
-	"github.com/TheCacophonyProject/go-cptv/pkg/cptvframe"
+	"github.com/TheCacophonyProject/go-cptv/cptvframe"
 	"github.com/TheCacophonyProject/lepton3"
 )
 

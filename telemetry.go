@@ -12,7 +12,7 @@ import (
 	"encoding/binary"
 	"time"
 
-	"github.com/TheCacophonyProject/go-cptv/pkg/cptvframe"
+	"github.com/TheCacophonyProject/go-cptv/cptvframe"
 )
 
 // These are the valid values for the Telemetry.FFCState field.

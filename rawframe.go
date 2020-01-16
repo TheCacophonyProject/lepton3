@@ -3,7 +3,7 @@ package lepton3
 import (
 	"encoding/binary"
 
-	"github.com/TheCacophonyProject/go-cptv/pkg/cptvframe"
+	"github.com/TheCacophonyProject/go-cptv/cptvframe"
 )
 
 type RawFrame [packetsPerFrame * vospiDataSize]byte
