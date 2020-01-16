@@ -66,10 +66,6 @@ func (l *Lepton3) ResY() int {
 	return FrameRows
 }
 
-func (l *Lepton3) FPS() int {
-	return FramesHz
-}
-
 // New returns a new Lepton3 instance.
 func New(spiSpeed int64) (*Lepton3, error) {
 	cciDev, err := openCCI()
