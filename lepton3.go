@@ -33,9 +33,10 @@ const (
 	FrameCols = 160
 
 	// FrameRows is the Y resolution of the Lepton 3 camera.
-	FrameRows = 120
-	FramesHz  = 9
-
+	FrameRows            = 120
+	FramesHz             = 9
+	Brand                = "flir"
+	Model                = "lepton3"
 	packetsPerSegment    = 61
 	maxPacketNum         = packetsPerSegment - 1
 	segmentsPerFrame     = 4
@@ -64,6 +65,9 @@ func (l *Lepton3) ResX() int {
 }
 func (l *Lepton3) ResY() int {
 	return FrameRows
+}
+func (l *Lepton3) FPS() int {
+	return FramesHz
 }
 
 // New returns a new Lepton3 instance.
