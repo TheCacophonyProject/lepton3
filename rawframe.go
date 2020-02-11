@@ -6,22 +6,24 @@ import (
 	"github.com/TheCacophonyProject/go-cptv/cptvframe"
 )
 
-type RawFrame [packetsPerFrame * vospiDataSize]byte
-
-func (rf *RawFrame) FrameData() []byte {
-	return rf[telemetryPacketCount*vospiDataSize:]
+// NewRawFrame returns a correctly sized byte slice for holding a
+// single Lepton 3 frame.
+func NewRawFrame() []byte {
+	return make([]byte, packetsPerFrame*vospiDataSize)
 }
 
-// ToFrame converts a RawFrame to a Frame.
-func (rf *RawFrame) ToFrame(out *cptvframe.Frame) error {
-	if err := ParseTelemetry(rf[:], &out.Status); err != nil {
+// ParseRawFrame converts a byte slice containing a raw Lepton 3 frame
+// into a cptvframe.Frame. The result is writing into the Frame
+// provided.
+func ParseRawFrame(raw []byte, out *cptvframe.Frame) error {
+	if err := ParseTelemetry(raw, &out.Status); err != nil {
 		return err
 	}
 
-	rawPix := rf.FrameData()
+	rawPix := raw[telemetryPacketCount*vospiDataSize:]
 	i := 0
 	for y, row := range out.Pix {
-		for x, _ := range row {
+		for x := range row {
 			out.Pix[y][x] = binary.BigEndian.Uint16(rawPix[i : i+2])
 			i += 2
 		}

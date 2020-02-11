@@ -70,6 +70,6 @@ func (f *frameBuilder) sequential(packetNum int) bool {
 	return packetNum == f.packetNum+1
 }
 
-func (f *frameBuilder) output(outFrame *RawFrame) {
-	copy(outFrame[:], f.frameBuf)
+func (f *frameBuilder) output(outFrame []byte) {
+	copy(outFrame, f.frameBuf)
 }
