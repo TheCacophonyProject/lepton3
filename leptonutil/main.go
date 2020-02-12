@@ -87,7 +87,7 @@ func runMain() error {
 		log.Printf(t)
 	})
 
-	rawFrame := new(lepton3.RawFrame)
+	rawFrame := lepton3.NewRawFrame()
 	frame := cptvframe.NewFrame(camera)
 	i := 0
 	for {
@@ -97,7 +97,9 @@ func runMain() error {
 		}
 		fmt.Printf(".")
 
-		rawFrame.ToFrame(frame)
+		if err := lepton3.ParseRawFrame(rawFrame, frame); err != nil {
+			return err
+		}
 		if opts.Verbose {
 			fmt.Printf("%+v\n", frame.Status)
 		}

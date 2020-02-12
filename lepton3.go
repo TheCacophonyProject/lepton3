@@ -29,14 +29,13 @@ const (
 	// Packets, segments and frames
 	//
 
-	// FrameCols is the X resolution of the Lepton 3 camera.
-	FrameCols = 160
+	FrameCols     = 160
+	FrameRows     = 120
+	FramesHz      = 9
+	BytesPerFrame = packetsPerFrame * vospiDataSize
+	Brand         = "flir"
+	Model         = "lepton3"
 
-	// FrameRows is the Y resolution of the Lepton 3 camera.
-	FrameRows            = 120
-	FramesHz             = 9
-	Brand                = "flir"
-	Model                = "lepton3"
 	packetsPerSegment    = 61
 	maxPacketNum         = packetsPerSegment - 1
 	segmentsPerFrame     = 4
@@ -44,6 +43,7 @@ const (
 	colsPerPacket        = FrameCols / 2
 	segmentPacketNum     = 20
 	telemetryPacketCount = 4
+	telemetryBytes       = telemetryPacketCount * vospiDataSize
 
 	// SPI transfer
 	packetsPerRead     = 128
@@ -166,17 +166,17 @@ func (d *Lepton3) Close() {
 	d.cciDev = nil
 }
 
-// NextFrame returns the next frame from the camera into the RawFrame
-// provided.
+// NextFrame returns the next frame from the camera into the raw frame
+// slice.
 //
-// The output RawFrame is provided (rather than being created by
+// The output slice is provided (rather than being created by
 // NextFrame) to minimise memory allocations.
 //
 // NextFrame should only be called after a successful call to
 // Open(). Although there is some internal buffering of camera
 // packets, NextFrame must be called frequently enough to ensure
 // frames are not lost.
-func (d *Lepton3) NextFrame(outFrame *RawFrame) error {
+func (d *Lepton3) NextFrame(outFrame []byte) error {
 	timeout := time.After(frameTimeout)
 	d.frameBuilder.reset()
 
@@ -217,12 +217,12 @@ func (d *Lepton3) NextFrame(outFrame *RawFrame) error {
 
 // Snapshot is convenience method for capturing a single frame. It
 // should *not* be called if streaming is already active.
-func (d *Lepton3) Snapshot() (*RawFrame, error) {
+func (d *Lepton3) Snapshot() ([]byte, error) {
 	if err := d.Open(); err != nil {
 		return nil, err
 	}
 	defer d.Close()
-	frame := new(RawFrame)
+	frame := NewRawFrame()
 	if err := d.NextFrame(frame); err != nil {
 		return nil, err
 	}
