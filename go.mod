@@ -12,4 +12,4 @@ require (
 )
 
 // We maintain a custom fork of periph.io at the moment.
-replace periph.io/x/periph => github.com/TheCacophonyProject/periph v2.0.1-0.20171123021141-d06ef89e37e8+incompatible
+replace periph.io/x/periph => github.com/TheCacophonyProject/periph v1.0.1-0.20200331204442-4717ddfb6980
