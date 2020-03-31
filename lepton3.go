@@ -132,6 +132,19 @@ func (d *Lepton3) GetFFCModeControl() (*FFCMode, error) {
 // SetFFCModeControl sets the parameters and state relating to FFC. To
 // avoid strange behaviour, it is important to call this with a FFCMode
 // based on a recent return from GetFFCModeControl.
+//
+// Lepton 3 camera defaults:
+// &FFCMode{
+//     FFCShutterMode:          FFCShutterModeAuto
+//     ShutterTempLockoutState: ShutterTempLockoutStateInactive
+//     VideoFreezeDuringFFC:    true
+//     FFCDesired               <dynamic state, no default>
+//     ElapsedTimeSinceLastFFC: <dynamic state, no default>
+//     DesiredFFCPeriod:        5 * time.Minute
+//     ExplicitCommandToOpen:   true
+//     DesiredFFCTempDelta:     CelsiusFromFloat(3.0)
+//     ImminentDelay:           52
+// }
 func (d *Lepton3) SetFFCModeControl(mode *FFCMode) error {
 	return d.cciDev.SetFFCModeControl(mode)
 }
