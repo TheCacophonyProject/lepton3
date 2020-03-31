@@ -124,6 +124,18 @@ func (d *Lepton3) SetRadiometry(enable bool) error {
 	return nil
 }
 
+// GetFFCModeControl returns the parameters and state relating to FFC.
+func (d *Lepton3) GetFFCModeControl() (*FFCMode, error) {
+	return d.cciDev.GetFFCModeControl()
+}
+
+// SetFFCModeControl sets the parameters and state relating to FFC. To
+// avoid strange behaviour, it is important to call this with a FFCMode
+// based on a recent return from GetFFCModeControl.
+func (d *Lepton3) SetFFCModeControl(mode *FFCMode) error {
+	return d.cciDev.SetFFCModeControl(mode)
+}
+
 // RunFFC forces the camera to run a Flat Field Correction
 // recalibration.
 func (d *Lepton3) RunFFC() error {

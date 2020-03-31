@@ -73,6 +73,12 @@ func runMain() error {
 		return err
 	}
 
+	ffcParams, err := camera.GetFFCModeControl()
+	if err != nil {
+		return err
+	}
+	fmt.Printf("FFC params: %+v\n", ffcParams)
+
 	if err := camera.SetRadiometry(true); err != nil {
 		return err
 	}
