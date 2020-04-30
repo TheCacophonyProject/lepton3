@@ -152,6 +152,9 @@ func (d *Lepton3) SetFFCModeControl(mode *FFCMode) error {
 // RunFFC forces the camera to run a Flat Field Correction
 // recalibration.
 func (d *Lepton3) RunFFC() error {
+	if d.cciDev == nil {
+		return errors.New("cant run FFC as cciDev is nil, is the camera open?")
+	}
 	return d.cciDev.RunFFC()
 }
 
