@@ -174,6 +174,14 @@ func (d *Lepton3) Open() error {
 	d.spiPort = spiPort
 	d.spiConn = spiConn
 
+	if d.cciDev == nil {
+		cciDev, err := openCCI()
+		if err != nil {
+			return err
+		}
+		d.cciDev = cciDev
+	}
+
 	return d.startStream()
 }
 
