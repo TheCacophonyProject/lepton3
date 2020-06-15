@@ -198,7 +198,7 @@ func (d *Lepton3) GetTLinearEnabled() (bool, error) {
 
 func (d *Lepton3) IsRadioMetricLeptonModel() bool {
 	_, err := d.GetTLinearEnabled()
-	return err != nil
+	return err == nil
 }
 
 // Open initialises the SPI connection and starts streaming packets
