@@ -5,6 +5,7 @@
 package lepton3
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -156,6 +157,48 @@ func (d *Lepton3) RunFFC() error {
 		return errors.New("cant run FFC as cciDev is nil, is the camera open?")
 	}
 	return d.cciDev.RunFFC()
+}
+
+// Get the camera serial number
+func (d *Lepton3) GetSerial() (uint64, error) {
+	if d.cciDev == nil {
+		return 0, errors.New("cant get serial as cciDev is nil, is the camera open?")
+	}
+	return d.cciDev.GetSerial()
+}
+
+// The OEM part number, which is a kind of configuration id
+func (d *Lepton3) GetPartNum() (string, error) {
+	partNum, err := d.cciDev.GetPartNum()
+	if err != nil {
+		return "", err
+	}
+	return string(partNum[:32]), err
+}
+
+// The software and dsp revisions, which we can use to try and determine what version of the lepton module we have.
+func (d *Lepton3) GetSoftwareVersion() (LeptonSoftwareRevision, error) {
+	versionInfo, err := d.cciDev.GetSoftwareVersion()
+	if err != nil {
+		return LeptonSoftwareRevision{}, err
+	}
+	buf := &bytes.Buffer{}
+	s := LeptonSoftwareRevision{}
+	_ = binary.Write(buf, binary.BigEndian, versionInfo)
+	_ = binary.Read(buf, binary.BigEndian, &s)
+	return s, err
+}
+
+// Whether or not TLinear is enabled. It is enabled by default on radiometric lepton modules (2.5, 3.5),
+// and trying to see if it is enabled on a lepton 3.0 gives an error, enabling us to determine reliably
+// if we have a radiometry enabled lepton module.
+func (d *Lepton3) GetTLinearEnabled() (bool, error) {
+	return d.cciDev.GetTLinearEnabled()
+}
+
+func (d *Lepton3) IsRadioMetricLeptonModel() bool {
+	_, err := d.GetTLinearEnabled()
+	return err != nil
 }
 
 // Open initialises the SPI connection and starts streaming packets
