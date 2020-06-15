@@ -167,9 +167,21 @@ func (d *Lepton3) GetSerial() (uint64, error) {
 	return d.cciDev.GetSerial()
 }
 
-// The OEM part number, which is a kind of configuration id
+// The OEM part number, which is distinct between lepton versions.
+// Lepton 3: 500-0726-01
+// Lepton 3.5: 500-0771-01
+// See https://www.flir.es/globalassets/imported-assets/document/lepton-3-3.5-datasheet.pdf
 func (d *Lepton3) GetPartNum() (string, error) {
 	partNum, err := d.cciDev.GetPartNum()
+	if err != nil {
+		return "", err
+	}
+	return string(partNum[:32]), err
+}
+
+// The OEM customer part number, which may or may not actually be useful
+func (d *Lepton3) GetCustomerPartNum() (string, error) {
+	partNum, err := d.cciDev.GetCustomerPartNum()
 	if err != nil {
 		return "", err
 	}
@@ -184,6 +196,7 @@ func (d *Lepton3) GetSoftwareVersion() (LeptonSoftwareRevision, error) {
 	}
 	buf := &bytes.Buffer{}
 	s := LeptonSoftwareRevision{}
+	// Byte order doesn't actually matter here since we're just writing a byte slice.
 	_ = binary.Write(buf, binary.BigEndian, versionInfo)
 	_ = binary.Read(buf, binary.BigEndian, &s)
 	return s, err
