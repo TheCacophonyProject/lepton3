@@ -3,7 +3,7 @@ module github.com/TheCacophonyProject/lepton3
 go 1.12
 
 require (
-	github.com/TheCacophonyProject/go-cptv v0.0.0-20200116020937-858bd8b71512
+	github.com/TheCacophonyProject/go-cptv v0.0.0-20200616224711-fc633122087a
 	github.com/alexflint/go-arg v0.0.0-20180516182405-f7c0423bd11e
 	github.com/alexflint/go-scalar v1.0.0 // indirect
 	golang.org/x/net v0.0.0-20200114155413-6afb5195e5aa // indirect

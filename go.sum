@@ -1,5 +1,8 @@
 github.com/TheCacophonyProject/go-cptv v0.0.0-20200116020937-858bd8b71512 h1:BXpQbq+aF0x1adZUuNXxx4akYwpCJ2VQZYpq1C/fxCE=
 github.com/TheCacophonyProject/go-cptv v0.0.0-20200116020937-858bd8b71512/go.mod h1:8H6Aaft5549sIWxcsuCIL2o60/TQkoF93fVoSTpgZb8=
+github.com/TheCacophonyProject/go-cptv v0.0.0-20200616224711-fc633122087a h1:HgrFoyS+wwf5LH37q8E+Kew7CAhksXyeA31Qh1C6T2w=
+github.com/TheCacophonyProject/go-cptv v0.0.0-20200616224711-fc633122087a/go.mod h1:Vg73Ezn4kr8qDNP9LNgjki9qgi+5T/0Uc9oDyflaYUY=
+github.com/TheCacophonyProject/lepton3 v0.0.0-20200121020734-2ae28662e1bc/go.mod h1:xzPAWtvVCbJdJC2Gn1cG0Ovs/VP7XGGiQpUU8wU4HME=
 github.com/TheCacophonyProject/periph v2.1.1-0.20200615222341-6834cd5be8c1+incompatible h1:0pEn1FoMTgOZR3EkqOTiqd0++jOS/jWlGrbvOHK0/KM=
 github.com/TheCacophonyProject/periph v2.1.1-0.20200615222341-6834cd5be8c1+incompatible/go.mod h1:K1wa07sGXKzV0G9p+4R069mZk4GOpqKW8GU6/k+BrIo=
 github.com/alexflint/go-arg v0.0.0-20180516182405-f7c0423bd11e h1:dzrBxLIjiq17Da9DhY3svGRhptiUg1LUzdkOuFYjAzA=
