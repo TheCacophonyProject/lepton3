@@ -30,6 +30,7 @@ func ParseTelemetry(raw []byte, t *cptvframe.Telemetry) error {
 	if err := binary.Read(bytes.NewBuffer(raw), Big16, &tw); err != nil {
 		return err
 	}
+
 	t.TimeOn = tw.TimeOn.ToD()
 	t.FFCState = statusToFFCState(tw.StatusBits)
 	t.FrameCount = int(tw.FrameCounter)
@@ -40,20 +41,33 @@ func ParseTelemetry(raw []byte, t *cptvframe.Telemetry) error {
 	return nil
 }
 
+type LeptonSoftwareRevision struct {
+	Gpp_major uint8
+	Gpp_minor uint8
+	Gpp_build uint8
+	Dsp_major uint8
+	Dsp_minor uint8
+	Dsp_build uint8
+	Reserved  [2]uint8
+}
+
 type telemetryWords struct {
-	TelemetryRevision  uint16     // 0  *
-	TimeOn             durationMS // 1  *
-	StatusBits         uint32     // 3  * Bit field
-	Reserved5          [8]uint16  // 5  *
-	SoftwareRevision   uint64     // 13 - Junk.
-	Reserved17         [3]uint16  // 17 *
-	FrameCounter       uint32     // 20 *
-	FrameMean          uint16     // 22 * The average value from the whole frame
-	FPATempCounts      uint16     // 23
-	FPATemp            centiK     // 24 *
-	Reserved25         [4]uint16  // 25
+	TelemetryRevision  uint16                 // 0  *
+	TimeOn             durationMS             // 1  *
+	StatusBits         uint32                 // 3  * Bit field
+	Reserved5          [8]uint16              // 5  *
+	SoftwareRevision   LeptonSoftwareRevision // 13 - Junk.
+	Reserved17         [3]uint16              // 17 *
+	FrameCounter       uint32                 // 20 *
+	FrameMean          uint16                 // 22 * The average value from the whole frame
+	FPATempCounts      uint16                 // 23
+	FPATemp            centiK                 // 24 *
+	HousingTempRaw     uint16
+	HousingTemp        centiK
+	Reserved25         [2]uint16  // 25
 	FPATempLastFFC     centiK     // 29
 	TimeCounterLastFFC durationMS // 30 *
+	HousingTempLastFFC centiK
 }
 
 // durationMS is duration in millisecond.
