@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"strings"
 	"time"
 
 	tomb "gopkg.in/tomb.v2"
@@ -36,6 +37,7 @@ const (
 	BytesPerFrame = packetsPerFrame * vospiDataSize
 	Brand         = "flir"
 	Model         = "lepton3"
+	Model35       = "lepton3.5"
 
 	packetsPerSegment    = 61
 	maxPacketNum         = packetsPerSegment - 1
@@ -212,6 +214,25 @@ func (d *Lepton3) GetTLinearEnabled() (bool, error) {
 func (d *Lepton3) IsRadioMetricLeptonModel() bool {
 	_, err := d.GetTLinearEnabled()
 	return err == nil
+}
+
+// Get the camera model. lepton or lepton3.5
+func (d *Lepton3) GetModel() (string, error) {
+	if d.cciDev == nil {
+		return "", errors.New("cant get model as cciDev is nil, is the camera open?")
+	}
+	partNum, err := d.GetPartNum()
+	if err != nil {
+		return "", err
+	}
+	partNum = strings.TrimRight(partNum, "\000")
+	switch partNum {
+	case "500-0726-01":
+		return Model, nil
+	case "500-0771-01":
+		return Model35, nil
+	}
+	return Model, nil
 }
 
 // Open initialises the SPI connection and starts streaming packets
