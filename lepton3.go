@@ -152,6 +152,23 @@ func (d *Lepton3) SetFFCModeControl(mode *FFCMode) error {
 	return d.cciDev.SetFFCModeControl(mode)
 }
 
+func (d *Lepton3) setFFCShutterMode(mode FFCShutterMode) error {
+	modeControl, err := d.GetFFCModeControl()
+	if err != nil {
+		return err
+	}
+	modeControl.FFCShutterMode = mode
+	return d.SetFFCModeControl(modeControl)
+}
+
+func (d *Lepton3) SetAutoFFC(auto bool) error {
+	if auto {
+		return d.setFFCShutterMode(FFCShutterModeAuto)
+	} else {
+		return d.setFFCShutterMode(FFCShutterModeManual)
+	}
+}
+
 // RunFFC forces the camera to run a Flat Field Correction
 // recalibration.
 func (d *Lepton3) RunFFC() error {
