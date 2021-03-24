@@ -23,12 +23,13 @@ import (
 )
 
 type Options struct {
-	Frames    int    `arg:"-f,help:number of frames to collect (default=all)"`
-	Speed     int64  `arg:"-s,help:SPI speed in MHz"`
-	Directory string `arg:"-d,help:Directory to write output files"`
-	PowerPin  string `arg:"-p,help:Optional pin to set to power on camera"`
-	Verbose   bool   `arg:"-v,help:Verbose output"`
-	Output    string `arg:"positional,required,help:png or none"`
+	Frames     int    `arg:"-f,help:number of frames to collect (default=all)"`
+	EdgePixels int    `arg:"-e,help:number of pixels that are part of the edge (Not validated)"`
+	Speed      int64  `arg:"-s,help:SPI speed in MHz"`
+	Directory  string `arg:"-d,help:Directory to write output files"`
+	PowerPin   string `arg:"-p,help:Optional pin to set to power on camera"`
+	Verbose    bool   `arg:"-v,help:Verbose output"`
+	Output     string `arg:"positional,required,help:png or none"`
 }
 
 func procCommandLine() Options {
@@ -103,7 +104,7 @@ func runMain() error {
 		}
 		fmt.Printf(".")
 
-		if err := lepton3.ParseRawFrame(rawFrame, frame); err != nil {
+		if err := lepton3.ParseRawFrame(rawFrame, frame, 1); err != nil {
 			return err
 		}
 		if opts.Verbose {
