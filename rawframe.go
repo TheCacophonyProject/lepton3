@@ -7,11 +7,11 @@ import (
 	"github.com/TheCacophonyProject/go-cptv/cptvframe"
 )
 
-type BaxPixelErr struct {
+type BadFrameErr struct {
 	Cause error
 }
 
-func (e *BaxPixelErr) Error() string {
+func (e *BadFrameErr) Error() string {
 	return e.Cause.Error()
 }
 
@@ -36,9 +36,9 @@ func ParseRawFrame(raw []byte, out *cptvframe.Frame, edgePixels int) error {
 		for x := range row {
 			out.Pix[y][x] = binary.BigEndian.Uint16(rawPix[i : i+2])
 			onEdge := y < edgePixels || x < edgePixels || y >= (len(out.Pix)-edgePixels) || x >= (len(row)-edgePixels)
-			if onEdge && out.Pix[y][x] == 0 {
+			if !onEdge && out.Pix[y][x] == 0 {
 				err := fmt.Errorf("Bad pixel (%d,%d) of %d", y, x, out.Pix[y][x])
-				return &BaxPixelErr{err}
+				return &BadFrameErr{err}
 			}
 			i += 2
 		}
